@@ -1,0 +1,83 @@
+ # Replace the `arn` property with the ARN of your SQS queue.
+apiVersion: flow.triggermesh.io/v1alpha1
+kind: Bridge
+metadata:
+  name: twilio-sqs
+spec:
+  components:
+    - object:
+        apiVersion: eventing.knative.dev/v1
+        kind: Broker
+        metadata:
+          annotations:
+            ui.triggermesh.io/sub-kind: DefaultBroker
+          name: default
+    - object:
+        apiVersion: sources.triggermesh.io/v1alpha1
+        kind: TwilioSource
+        metadata:
+          name: twilio
+        spec:
+          sink:
+            ref:
+              apiVersion: eventing.knative.dev/v1
+              kind: Broker
+              name: default
+    - object:
+        apiVersion: serving.knative.dev/v1
+        kind: Service
+        metadata:
+          name: all-display
+          namespace: demo
+        spec:
+          template:
+            metadata:
+            spec:
+              containers:
+                - image: gcr.io/knative-releases/knative.dev/eventing-contrib/cmd/event_display@sha256:46d5a66f300c3ced590835d379a0e9badf413ae7ab60f21a2550ecedbc9eb9d3
+    - object:
+        apiVersion: eventing.knative.dev/v1
+        kind: Trigger
+        metadata:
+          name: all-display-trigger
+          namespace: demo
+        spec:
+          broker: default
+          subscriber:
+            ref:
+              apiVersion: serving.knative.dev/v1
+              kind: Service
+              name: all-display
+    - object:
+        apiVersion: targets.triggermesh.io/v1alpha1
+        kind: AWSSQSTarget
+        metadata:
+          name: sqssinks
+        spec:
+          # Replace the `arn` property with the ARN of your SQS queue.
+          arn: <your-arn>
+          awsApiKey:
+            secretKeyRef:
+              key: access_key_id
+              name: aws
+          awsApiSecret:
+            secretKeyRef:
+              key: secret_access_key
+              name: aws
+          discardCloudEventContext: false
+    - object:
+        apiVersion: eventing.knative.dev/v1
+        kind: Trigger
+        metadata:
+          name: sdf-trigger
+          namespace: demo
+        spec:
+          broker: default
+          filter:
+            attributes:
+              type: com.triggermesh.twilio.sms
+          subscriber:
+            ref:
+              apiVersion: targets.triggermesh.io/v1alpha1
+              kind: AWSSQSTarget
+              name: sqssinks

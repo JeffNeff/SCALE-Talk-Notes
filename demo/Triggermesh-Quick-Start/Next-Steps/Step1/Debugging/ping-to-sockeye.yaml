@@ -1,0 +1,29 @@
+# A simple example demonstrating event sending and receiving.
+apiVersion: sources.knative.dev/v1
+kind: PingSource
+metadata:
+  name: ping-sockeye
+spec:
+  data: '{"name": "triggermesh"}'
+  # events are sent on a cron schedule. in this example, they will be sent every minute.
+  schedule: '*/1 * * * *'
+  sink:
+    ref:
+      apiVersion: serving.knative.dev/v1
+      kind: Service
+      name: sockeye
+
+---
+
+# Get the Sockeye event viewer URL using this command:
+# kubectl get ksvc sockeye -o=jsonpath='{.status.url}'
+
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: sockeye
+spec:
+  template:
+    spec:
+      containers:
+        - image: docker.io/n3wscott/sockeye:v0.7.0@sha256:e603d8494eeacce966e57f8f508e4c4f6bebc71d095e3f5a0a1abaf42c5f0e48

@@ -1,0 +1,91 @@
+apiVersion: flow.triggermesh.io/v1alpha1
+kind: Bridge
+metadata:
+  name: bridgedl-generated
+spec:
+  components:
+  - object:
+      apiVersion: sources.triggermesh.io/v1alpha1
+      kind: AWSPerformanceInsightsSource
+      metadata:
+        name: my-pi
+      spec:
+        arn: <your-arn>
+        credentials:
+          accessKeyID:
+            valueFromSecret:
+              key: access_key_id
+              name: aws
+          secretAccessKey:
+            valueFromSecret:
+              key: secret_access_key
+              name: aws
+        metricQueries:
+        - os.cpuUtilization.idle.avg
+        - os.general.numVCPUs.avg
+        - os.network.rx.avg
+        - os.network.tx.avg
+        - os.fileSys.total.avg
+        - os.fileSys.used.avg
+        - os.memory.active.avg
+        - os.memory.total.avg
+        - os.tasks.blocked.avg
+        - os.tasks.zombie.avg
+        pollingInterval: 1m
+        sink:
+          ref:
+            apiVersion: messaging.knative.dev/v1
+            kind: Channel
+            name: pi-datadog
+  - object:
+      apiVersion: messaging.knative.dev/v1
+      kind: Channel
+      metadata:
+        name: pi-datadog
+  - object:
+      apiVersion: targets.triggermesh.io/v1alpha1
+      kind: DatadogTarget
+      metadata:
+        name: dashboard
+      spec:
+        apiKey:
+          secretKeyRef:
+            key: apiKey
+            name: ddapitoken
+        metricPrefix: slackgeneral
+  - object:
+      apiVersion: targets.triggermesh.io/v1alpha1
+      kind: InfraTarget
+      metadata:
+        name: pi-datadog
+      spec:
+        script:
+          code: |
+            function handle(input) {
+                var dateobj = Math.floor(Date.now() / 1000)
+                input.data = {"series":[{"metric":input.data.metric,"points":[[String(dateobj),String(input.data.value)]]}]}
+                input.type = "io.triggermesh.datadog.metric.submit"
+                log(input.data.series[0].metric)
+                return input;
+              return input;
+            }
+  - object:
+      apiVersion: messaging.knative.dev/v1
+      kind: Subscription
+      metadata:
+        name: pi-datadog
+      spec:
+        channel:
+          apiVersion: messaging.knative.dev/v1
+          kind: Channel
+          name: pi-datadog
+        reply:
+          ref:
+            apiVersion: targets.triggermesh.io/v1alpha1
+            kind: DatadogTarget
+            name: dashboard
+        subscriber:
+          ref:
+            apiVersion: targets.triggermesh.io/v1alpha1
+            kind: InfraTarget
+            name: pi-datadog

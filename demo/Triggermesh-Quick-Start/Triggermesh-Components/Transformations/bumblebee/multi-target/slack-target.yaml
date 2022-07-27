@@ -1,0 +1,101 @@
+# Copyright 2021 TriggerMesh Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+apiVersion: v1
+kind: Secret
+metadata:
+  name: slacktarget
+type: Opaque
+data:
+  token: <Slack token>
+
+---
+
+apiVersion: eventing.knative.dev/v1
+kind: Trigger
+metadata:
+  name: slack-transformation-trigger
+spec:
+  broker: transformation-demo
+  filter:
+    attributes:
+      type: io.triggermesh.transformation.github
+  subscriber:
+    ref:
+      apiVersion: flow.triggermesh.io/v1alpha1
+      kind: Transformation
+      name: slack-transformation
+
+---
+
+apiVersion: flow.triggermesh.io/v1alpha1
+kind: Transformation
+metadata:
+  name: slack-transformation
+spec:
+  context:
+  - operation: add
+    paths:
+    - key: type
+      value: com.slack.webapi.chat.postMessage
+
+  data:
+  - operation: store
+    paths:
+    - key: $object
+      value: object
+    - key: $subject
+      value: subject
+    - key: $verb
+      value: verb
+
+  - operation: delete
+    paths:
+    - key:
+
+  - operation: add
+    paths:
+    - key: channel
+      value: github-demo-channel
+    - key: text
+      value: '$object at $subject: $verb'
+
+---
+
+apiVersion: eventing.knative.dev/v1
+kind: Trigger
+metadata:
+  name: slack-target-trigger
+spec:
+  broker: transformation-demo
+  filter:
+    attributes:
+      type: com.slack.webapi.chat.postMessage
+  subscriber:
+    ref:
+      apiVersion: targets.triggermesh.io/v1alpha1
+      kind: SlackTarget
+      name: transformation-slack-demo
+
+---
+
+apiVersion: targets.triggermesh.io/v1alpha1
+kind: SlackTarget
+metadata:
+  name: transformation-slack-demo
+spec:
+  token:
+    secretKeyRef:
+      name: slacktarget
+      key: token

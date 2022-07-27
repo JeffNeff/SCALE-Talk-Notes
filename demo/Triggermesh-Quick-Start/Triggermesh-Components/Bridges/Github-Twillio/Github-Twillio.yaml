@@ -1,0 +1,116 @@
+apiVersion: flow.triggermesh.io/v1alpha1
+kind: Bridge
+metadata:
+    annotations:
+        bridges.triggermesh.io/name: github-twilio
+spec:
+    components:
+        - object:
+              apiVersion: eventing.knative.dev/v1
+              kind: Broker
+              metadata:
+                  name: gh-broker
+
+        - object:
+              apiVersion: sources.knative.dev/v1alpha1
+              kind: GitHubSource
+              metadata:
+                  name: github-demo
+              spec:
+                  accessToken:
+                      secretKeyRef:
+                          key: accessToken
+                          name: github-secret
+                  eventTypes:
+                      - push
+                      - commit_comment
+                  ownerAndRepository: tmdemo/demo
+                  secretToken:
+                      secretKeyRef:
+                          key: secretToken
+                          name: github-secret
+                  sink:
+                      ref:
+                          apiVersion: eventing.knative.dev/v1
+                          kind: Broker
+                          name: gh-broker
+
+        - object:
+              apiVersion: flow.triggermesh.io/v1alpha1
+              kind: Transformation
+              metadata:
+                  name: gh-twillio
+              spec:
+                  context:
+                      - operation: add
+                        paths:
+                            - key: type
+                              value: io.triggermesh.twilio.sms.send
+                  data:
+                      - operation: store
+                        paths:
+                            - key: $repository
+                              value: repository.name
+                            - key: $message
+                              value: head_commit.message
+                            - key: $author
+                              value: head_commit.author.username
+
+                      - operation: delete
+                        paths:
+                            - key: null
+                      - operation: add
+                        paths:
+                            - key: message
+                              value: >-
+                                  $author : has made changes at
+                                  $repository.
+
+        - object:
+              apiVersion: eventing.knative.dev/v1
+              kind: Trigger
+              metadata:
+                  name: gh-twillio
+              spec:
+                  broker: gh-broker
+                  filter:
+                      attributes:
+                          type: dev.knative.source.github.push
+                  subscriber:
+                      ref:
+                          apiVersion: flow.triggermesh.io/v1alpha1
+                          kind: Transformation
+                          name: gh-twillio
+
+        - object:
+              apiVersion: targets.triggermesh.io/v1alpha1
+              kind: TwilioTarget
+              metadata:
+                  name: twill
+              spec:
+                  defaultPhoneFrom: "+15098509745"
+                  defaultPhoneTo: "+19196978702"
+                  sid:
+                      secretKeyRef:
+                          key: sid
+                          name: twilio
+                  token:
+                      secretKeyRef:
+                          key: token
+                          name: twilio
+
+        - object:
+              apiVersion: eventing.knative.dev/v1
+              kind: Trigger
+              metadata:
+                  name: twill
+              spec:
+                  broker: gh-broker
+                  filter:
+                      attributes:
+                          type: io.triggermesh.twilio.sms.send
+                  subscriber:
+                      ref:
+                          apiVersion: targets.triggermesh.io/v1alpha1
+                          kind: TwilioTarget
+                          name: twill

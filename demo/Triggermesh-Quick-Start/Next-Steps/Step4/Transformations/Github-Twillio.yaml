@@ -1,0 +1,119 @@
+# secrete
+
+apiVersion: v1
+kind: Secret
+metadata:
+  name: github-secret
+type: Opaque
+stringData:
+  accessToken: <GITHUB_ACCESS_TOKEN>
+  secretToken: <GITHUB_SECRET_TOKEN>
+
+---
+
+apiVersion: eventing.knative.dev/v1
+kind: Broker
+metadata:
+    name: gh-broker
+
+---
+apiVersion: sources.knative.dev/v1alpha1
+kind: GitHubSource
+metadata:
+    name: github-demo
+spec:
+    accessToken:
+        secretKeyRef:
+            key: accessToken
+            name: github-secret
+    eventTypes:
+        - push
+        - commit_comment
+    ownerAndRepository: <OWNER_AND_REPO>
+    secretToken:
+        secretKeyRef:
+            key: secretToken
+            name: github-secret
+    sink:
+        ref:
+            apiVersion: eventing.knative.dev/v1
+            kind: Broker
+            name: gh-broker
+
+---
+apiVersion: flow.triggermesh.io/v1alpha1
+kind: Transformation
+metadata:
+    name: gh-twillio
+spec:
+    context:
+        - operation: add
+          paths:
+              - key: type
+                value: io.triggermesh.twilio.sms.send
+    data:
+        - operation: store
+          paths:
+              - key: $repository
+                value: repository.name
+              - key: $message
+                value: head_commit.message
+              - key: $author
+                value: head_commit.author.username
+        - operation: delete
+          paths:
+              - key: null
+        - operation: add
+          paths:
+              - key: message
+                value: >-
+                    $author : has made changes at
+                    $repository.
+---
+apiVersion: eventing.knative.dev/v1
+kind: Trigger
+metadata:
+    name: gh-twillio
+spec:
+    broker: gh-broker
+    filter:
+        attributes:
+            type: dev.knative.source.github.push
+    subscriber:
+        ref:
+            apiVersion: flow.triggermesh.io/v1alpha1
+            kind: Transformation
+            name: gh-twillio
+
+---
+apiVersion: targets.triggermesh.io/v1alpha1
+kind: TwilioTarget
+metadata:
+    name: twill
+spec:
+    defaultPhoneFrom: <DEFAULT_PHONE_FROM>
+    defaultPhoneTo: <DEFAULT_PHONE_TO>
+    sid:
+        secretKeyRef:
+            key: sid
+            name: twilio
+    token:
+        secretKeyRef:
+            key: token
+            name: twilio
+
+---
+apiVersion: eventing.knative.dev/v1
+kind: Trigger
+metadata:
+    name: twill
+spec:
+    broker: gh-broker
+    filter:
+        attributes:
+            type: io.triggermesh.twilio.sms.send
+    subscriber:
+        ref:
+            apiVersion: targets.triggermesh.io/v1alpha1
+            kind: TwilioTarget
+            name: twill

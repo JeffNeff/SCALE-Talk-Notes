@@ -1,0 +1,14 @@
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+    name: sockeye
+
+spec:
+  template:
+   metadata:
+   spec:
+    containers:
+     - env: []
+       envFrom: []
+       image: >-
+           docker.io/n3wscott/sockeye:v0.5.0@sha256:64c22fe8688a6bb2b44854a07b0a2e1ad021cd7ec52a377a6b135afed5e9f5d2

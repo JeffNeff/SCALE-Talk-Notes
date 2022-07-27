@@ -1,0 +1,62 @@
+
+# Replace the `arn` property with the ARN of your CloudWatch Logs group.
+apiVersion: flow.triggermesh.io/v1alpha1
+kind: Bridge
+metadata:
+  name: cloudwatchlogs-logz
+spec:
+  components:
+  - object:
+        apiVersion: eventing.knative.dev/v1
+        kind: Broker
+        metadata:
+            annotations:
+                ui.triggermesh.io/sub-kind: DefaultBroker
+            name: default
+  - object:
+        # Replace the `arn` property with the ARN of your CloudWatch Logs group.
+        apiVersion: sources.triggermesh.io/v1alpha1
+        kind: AWSCloudWatchLogsSource
+        metadata:
+            name: cwsss
+        spec:
+            arn: <your-arn>
+            credentials:
+                accessKeyID:
+                    valueFromSecret:
+                        key: access_key_id
+                        name: aws
+                secretAccessKey:
+                    valueFromSecret:
+                        key: secret_access_key
+                        name: aws
+            pollingInterval: 1m
+            sink:
+                ref:
+                    apiVersion: eventing.knative.dev/v1
+                    kind: Broker
+                    name: default
+  - object:
+        apiVersion: targets.triggermesh.io/v1alpha1
+        kind: LogzTarget
+        metadata:
+            name: logz
+        spec:
+            logsListenerURL: listener.logz.io
+            shippingToken:
+                secretKeyRef:
+                    key: token
+                    name: logzcreds
+  - object:
+        apiVersion: eventing.knative.dev/v1
+        kind: Trigger
+        metadata:
+            name: logz-triggerss
+            namespace: demo
+        spec:
+            broker: default
+            subscriber:
+                ref:
+                    apiVersion: targets.triggermesh.io/v1alpha1
+                    kind: LogzTarget
+                    name: logz
