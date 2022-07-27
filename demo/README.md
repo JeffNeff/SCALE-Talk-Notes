@@ -48,7 +48,7 @@ The demos are broken down into the following categories:
 
 `./Step3/EventTargets/` - Use one of the Triggermesh event Targets to receive events.
 
-`./Step4/Transformations/` - Use one of the Triggermesh transformations to transform events.
+`./Step4/Transformations/` - Use one of the Triggermesh transformations to transform events. (TODO)
 
 `./Step5/AdvancedRouting/` - Use one of the Triggermesh event routing mechanisms to route events. (TODO)
 
